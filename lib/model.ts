@@ -18,3 +18,12 @@ const aliases:Record<string,string>={'full name':'name','contact name':'name','n
 export function mapRow(row:Record<string,unknown>){const out:Record<string,string>={};for(const [key,value] of Object.entries(row)){const mapped=aliases[key.trim().toLowerCase().replace(/[_-]/g,' ')];if(mapped&&value!=null)out[mapped]=String(value).trim()} if(!out.name)out.name=[out.first,out.last].filter(Boolean).join(' ');delete out.first;delete out.last;return {...blank,...out,name:out.name||out.email||out.linkedin||out.phone||''};}
 export function parseLoose(text:string){const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);const email=lines.find(x=>/^[\w.+-]+@[\w.-]+\.[a-z]{2,}$/i.test(x))||'';const linkedin=lines.find(x=>/linkedin\.com\/in\//i.test(x))||'';const job=lines.find(x=>/ at /i.test(x));const parts=job?.split(/ at /i)||[];return {...blank,name:lines.find(x=>x!==email&&x!==linkedin&&x!==job)||email||linkedin,title:parts[0]||'',company:parts.slice(1).join(' at '),email,linkedin,notes:text};}
 export function safeLink(value:string){try{const url=new URL(value.startsWith('http')?value:'https://'+value);return ['https:','http:'].includes(url.protocol)?url.href:null}catch{return null}}
+
+/** Calendar-day window for scheduled follow-ups (not business days). */
+export function calendarDays(n:number,start=new Date()){const d=new Date(start);d.setDate(d.getDate()+n);return dateKey(d)}
+export function sortFollowUps(list:Contact[]){return [...list].sort((a,b)=>(a.next_date||'').localeCompare(b.next_date||'')||priorities.indexOf(a.priority as typeof priorities[number])-priorities.indexOf(b.priority as typeof priorities[number])||a.name.localeCompare(b.name))}
+export function upcomingGroups(contacts:Contact[],today:string,end:string|null){
+ const groups:Record<string,Contact[]>={};
+ for(const c of sortFollowUps(contacts.filter(c=>bucket(c,today)==='upcoming'&&(!end||c.next_date!<=end)))){const day=c.next_date!;(groups[day]??=[]).push(c)}
+ return Object.entries(groups).map(([date,items])=>({date,items}));
+}

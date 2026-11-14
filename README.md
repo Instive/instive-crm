@@ -31,7 +31,7 @@ First row of XLSX/CSV/TSV must contain headers. Common header aliases include Na
 
 ## Scope and limitations
 
-- Today shows due, overdue, new and unscheduled active prospects. Outreach activity updates status and next date atomically; date defaults are editable and skip weekends, not holidays.
+- Today shows due, overdue, upcoming, new and unscheduled active prospects. The Follow-ups page shows scheduled actions grouped by date, with a 7-day, 30-day or all-upcoming window and priority filter. Dates are local calendar dates; the window includes weekends. Reschedule opens contact editing and snooze moves the current due date (or today, if overdue) one business day forward. Outreach activity updates status and next date atomically; date defaults are editable and skip weekends, not holidays.
 - Contacts and interaction history are workspace-shared under row-level security. The app stores a single next action on each contact, not a full task queue per contact.
 - Companies are grouped by name with optional company metadata. Deals support a single linked contact, type, stage, value and expected close date; stage is edited in a form, not dragged.
 - Analytics are all-time counts and status/channel breakdowns. Campaign tracking, AI parsing, Gmail, calendar sync, automatic lead generation, reminders, enrichment, lead scoring and fine-grained team roles are future work.
