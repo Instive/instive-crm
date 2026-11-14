@@ -49,3 +49,7 @@ git push -u origin main
 ```
 
 If the remote is no longer empty, clone it and copy these files into a branch instead of overwriting existing work.
+
+## Daily outreach planner (v0.3)
+
+Today and Outreach show scheduled active tasks, prioritizing due warm follow-ups before first outreach. Default daily caps: 5 new DMs/connection requests and 12 follow-up messages. Drafts use the saved contact research campaign and historical message notes, or a conservative role-based template. Review current LinkedIn profile and conversation first; no messages are automatically sent. Only confirmed manual sending records an activity and updates the next date via the existing RLS-protected log_activity RPC. Initial DM: +3 business days; connection request: check acceptance +5 business days; first follow-up: +5 business days; second unanswered follow-up: pause. Replied contacts may need a custom next action; record reply and review. Draft edits are local until logged as the sent message. Future scheduling uses existing contacts.next_date; the app never bulk contacts LinkedIn or claims that research-only profiles are current. No new database schema required.
