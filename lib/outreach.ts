@@ -25,6 +25,7 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
  if(followups>=2)return {text:'',kind:'review',guidance:'Two unanswered follow-ups already logged. Pause unless there is a new reply or a clear agreed next step.',topic};
  const saved=noteField(c.notes,'Outreach draft')||noteField(c.notes,'Suggested LinkedIn follow-up');
  if(!managed&&saved)return {text:saved,kind:'follow',guidance:'Context-based draft. Read the latest LinkedIn thread and confirm this has not already been sent.',topic};
+ if(latest&&replies.includes(latest.kind))return {text:'',kind:'review',guidance:'A reply or meeting was logged. Open the latest thread and use Record reply / Log activity to respond with context.',topic};
  if(c.status==='Contacted'||managed){return {text:followups===0?g+' just following up on my earlier note. Is '+topic+' something your team is looking to improve, or is it already covered by your current systems?':g+' I’ll close the loop for now. If reducing manual work around '+topic+' becomes relevant, happy to compare notes. Thanks!',kind:'follow',guidance:'Check the latest thread first. Do not send if they have replied, declined, or the topic is no longer relevant.',topic}}
  return {text:g+' wanted to reconnect on our earlier conversation. Is there a specific operational workflow worth exploring together, or has your focus shifted since we last spoke?',kind:'follow',guidance:'Review the last conversation and tailor the draft before sending.',topic};
 }
@@ -36,8 +37,8 @@ export function nextAfterSend(c:Contact,history:Activity[],kind:string,start=new
 }
 export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKey()){
  const due=contacts.filter(c=>!inactive(c)&&c.status!=='Nurture'&&c.next_date&&c.next_date<=today);
- const follow=sortFollowUps(due.filter(c=>c.status!=='New'));
- const first=sortFollowUps(due.filter(c=>c.status==='New'));
+ const follow=sortFollowUps(due.filter(c=>c.status!=='New'&&c.status!=='Meeting booked'));
+ const first=sortFollowUps(due.filter(c=>c.status==='New'&&linkedinProfile(c)!==null));
  const sentToday=activities.filter(a=>outbound.includes(a.kind)&&dateKey(new Date(a.created_at))===today);
  const newToday=new Set(sentToday.filter(a=>a.kind==='First outreach sent'||a.kind==='Connection request sent').map(a=>a.contact_id)).size;
  const followToday=new Set(sentToday.filter(a=>a.kind==='Follow-up sent').map(a=>a.contact_id)).size;

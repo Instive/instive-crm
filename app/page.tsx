@@ -51,7 +51,7 @@ if(!session)return <div className="login"><div className="loginbox"><div classNa
 async function copyDraft(text:string){try{await navigator.clipboard.writeText(text);setMessage('Draft copied. Review and send manually on LinkedIn.')}catch{setError('Clipboard unavailable. Select and copy the draft text manually.')}}
 async function markOutreach(c:Contact,kind:string,text:string){
  if(!text.trim())return;
- if(!confirm(kind==='Connection request sent'?'Confirm you sent the connection request on LinkedIn.':'Confirm you sent this exact message on LinkedIn. Copying does not count as sending.'))return;
+ if(!confirm(kind==='Connection request sent'?'Confirm you sent the connection request on LinkedIn.':'Confirm you checked the latest LinkedIn thread and sent this exact message. If a connection request was pending, confirm it was accepted first. Copying does not count as sending.'))return;
  await run(async()=>{const latest=await client()!.from('contacts').select('*').eq('workspace_id',workspace).eq('id',c.id).single();if(latest.error)throw latest.error;const current=latest.data as Contact;if(inactive(current)||current.status==='Nurture'||current.status==='Meeting booked'||current.status!==c.status||current.next_date!==c.next_date||current.next_action!==c.next_action)throw Error('Contact changed. Refresh before logging outreach.');
  const hist=await client()!.from('activities').select('*').eq('workspace_id',workspace).eq('contact_id',c.id).order('created_at',{ascending:false});if(hist.error)throw hist.error;
  const h=hist.data as Activity[];if(h[0]?.id!==contactHistory(c,activities)[0]?.id)throw Error('New activity recorded. Refresh before logging another message.');
