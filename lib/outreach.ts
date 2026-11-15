@@ -7,6 +7,8 @@ const replies=['Reply received','Positive reply','Meeting booked','Meeting compl
 export function linkedinProfile(c:Contact){try{const u=new URL(c.linkedin);return u.protocol==='https:'&&['linkedin.com','www.linkedin.com'].includes(u.hostname.toLowerCase())&&u.pathname.startsWith('/in/')?u.href:null}catch{return null}}
 export function firstName(c:Contact){if(/\b(llc|ltd|inc|logistics llc|surname unavailable)\b/i.test(c.name))return '';return c.name.trim().replace(/^[^\p{L}]+/u,'').split(/\s+/)[0]||''}
 export function noteField(notes:string,label:string){const line=notes.split(/\r?\n/).reverse().find(l=>l.startsWith(label+':'));return line?.slice(label.length+1).trim()||''}
+export function researchContext(c:Contact){return {insight:noteField(c.notes,'Research insight'),source:noteField(c.notes,'Research source'),checked:noteField(c.notes,'Research checked'),draft:noteField(c.notes,'Research outreach draft')}}
+export function researchSource(value:string){try{const u=new URL(value);return u.protocol==='https:'?u.href:null}catch{return null}}
 export function contactHistory(c:Contact,activities:Activity[]){return activities.filter(a=>a.contact_id===c.id).sort((a,b)=>b.created_at.localeCompare(a.created_at))}
 export function unansweredFollowUps(history:Activity[]){let n=0;for(const a of history){if(replies.includes(a.kind))break;if(a.kind==='Follow-up sent')n++}return n}
 export function campaignTopic(c:Contact){const campaign=noteField(c.notes,'Recommended Campaign');const context=campaign||[c.title,c.industry,c.company].join(' ');if(/carrier email|carrier.*assignment|dispatch/i.test(context))return 'carrier emails, dispatch updates and TMS assignment';if(/rate confirmation|quote|broker/i.test(context))return 'rate confirmations and load details entering the TMS';if(/POD|billing|invoice|accounts payable|finance/i.test(context))return 'POD checks and invoice processing';if(/order entry|ERP|distribution/i.test(context))return 'order emails and ERP data entry';if(/warehouse|WMS/i.test(context))return 'warehouse updates and WMS handoffs';if(/load tender|freight|transport|logistics/i.test(context))return 'load requests and TMS data entry';return 'manual handoffs between email and operational systems'}
@@ -17,13 +19,13 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
  const topic=campaignTopic(c),g=firstName(c)?'Hey '+firstName(c)+',':'Hi,';
  if(inactive(c)||c.status==='Nurture')return {text:'',kind:'review',guidance:'Do not send outreach; this relationship is paused or closed.',topic};
  if(c.status==='Meeting booked')return {text:'',kind:'review',guidance:'Check meeting details and prepare; do not send a generic follow-up.',topic};
- if(c.status==='New')return {text:opener(c),kind:'initial',guidance:'Verify current profile and check LinkedIn history first. If not connected, use the connection note instead; do not assume this is a new conversation.',topic};
+ if(c.status==='New')return {text:researchContext(c).draft||opener(c),kind:'initial',guidance:'Verify current profile and check LinkedIn history first. If not connected, use the connection note instead; do not assume this is a new conversation.',topic};
  const latest=history.find(a=>outbound.includes(a.kind)||replies.includes(a.kind));
- if(latest?.kind==='Connection request sent')return {text:opener(c),kind:'review',guidance:'Check whether the connection was accepted. If accepted and no DM was sent, you may send this opener; otherwise snooze or pause.',topic};
+ if(latest?.kind==='Connection request sent')return {text:researchContext(c).draft||opener(c),kind:'review',guidance:'Check whether the connection was accepted. If accepted and no DM was sent, you may send this opener; otherwise snooze or pause.',topic};
  const managed=history.some(a=>outbound.includes(a.kind));
  const followups=unansweredFollowUps(history);
  if(followups>=2)return {text:'',kind:'review',guidance:'Two unanswered follow-ups already logged. Pause unless there is a new reply or a clear agreed next step.',topic};
- const saved=noteField(c.notes,'Outreach draft')||noteField(c.notes,'Suggested LinkedIn follow-up');
+ const saved=noteField(c.notes,'Outreach draft')||researchContext(c).draft||noteField(c.notes,'Suggested LinkedIn follow-up');
  if(!managed&&saved)return {text:saved,kind:'follow',guidance:'Context-based draft. Read the latest LinkedIn thread and confirm this has not already been sent.',topic};
  if(latest&&replies.includes(latest.kind))return {text:'',kind:'review',guidance:'A reply or meeting was logged. Open the latest thread and use Record reply / Log activity to respond with context.',topic};
  if(c.status==='Contacted'||managed){return {text:followups===0?g+' just following up on my earlier note. Is '+topic+' something your team is looking to improve, or is it already covered by your current systems?':g+' I’ll close the loop for now. If reducing manual work around '+topic+' becomes relevant, happy to compare notes. Thanks!',kind:'follow',guidance:'Check the latest thread first. Do not send if they have replied, declined, or the topic is no longer relevant.',topic}}
