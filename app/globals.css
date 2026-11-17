@@ -9,3 +9,6 @@
 @media(max-width:650px){.outreach-progress{grid-template-columns:1fr;gap:6px;padding:10px}.outreach-progress>div{grid-template-columns:1fr auto;align-items:center}.outreach-card-head,.outreach-body{padding:12px}.outreach-card-head .taskname{flex-basis:100%}}
 
 .research-insight{display:grid;gap:7px;border:1px solid #ead9bd;border-left:3px solid var(--amber);border-radius:8px;padding:12px 14px;background:#fffbf4}.research-insight strong{font-size:13px}.research-insight p{line-height:1.5;color:var(--ink)}.research-insight .link{width:fit-content;font-size:12px}
+
+/* Keep notifications out of document flow and preserve the visible row during saves. */
+main[data-page]{overflow-anchor:none}.toast-stack{position:fixed;top:78px;right:22px;z-index:50;display:grid;gap:8px;width:min(440px,calc(100vw - 24px));pointer-events:none}.toast-stack .error,.toast-stack .success{margin:0;box-shadow:0 4px 20px #0e1a2426;pointer-events:auto;border:1px solid currentColor}.toast-stack button{flex-shrink:0;display:flex;align-items:center}.refresh-button{padding:10px 12px}@media(max-width:650px){.toast-stack{right:12px}.refresh-button span{display:none}.refresh-button{padding:10px}.top .actions{gap:5px;flex-wrap:nowrap}}
