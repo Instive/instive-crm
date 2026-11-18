@@ -37,12 +37,29 @@ export function nextAfterSend(c:Contact,history:Activity[],kind:string,start=new
  if(unansweredFollowUps(history)>=1)return {status:'Nurture',date:null,action:'Paused after two unanswered follow-ups; reconnect only on new signal or reply'};
  return {status:c.status==='New'?'Contacted':c.status,date:businessDays(5,start),action:'LinkedIn: check reply; final follow-up if appropriate'};
 }
+// Store pull-forward assignments on the contact so the extra daily quota survives refreshes and completed sends.
+const pullMarker=(day:string)=>'Outbound pulled forward: '+day;
+export function pulledForwardToday(c:Contact,day:string){return c.notes.split(/\r?\n/).some(line=>line.trim()===pullMarker(day))}
+export function pullForwardNotes(c:Contact,day:string){return pulledForwardToday(c,day)?c.notes:[c.notes,pullMarker(day)].filter(Boolean).join('\n')}
+export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today=dateKey()){
+ const alreadySent=new Set(activities.filter(a=>outbound.includes(a.kind)).map(a=>a.contact_id));
+ const eligible=sortFollowUps(contacts.filter(c=>c.status==='New'&&c.next_date&&c.next_date>today&&linkedinProfile(c)!==null&&!alreadySent.has(c.id)&&!pulledForwardToday(c,today)));
+ const date=eligible[0]?.next_date??null;
+ return {date,items:date?eligible.filter(c=>c.next_date===date):[]};
+}
 export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKey()){
  const due=contacts.filter(c=>!inactive(c)&&c.status!=='Nurture'&&c.next_date&&c.next_date<=today);
  const follow=sortFollowUps(due.filter(c=>c.status!=='New'&&c.status!=='Meeting booked'));
  const first=sortFollowUps(due.filter(c=>c.status==='New'&&linkedinProfile(c)!==null));
+ const pulled=first.filter(c=>pulledForwardToday(c,today));
+ const normal=first.filter(c=>!pulledForwardToday(c,today));
+ const extraNew=contacts.filter(c=>pulledForwardToday(c,today)).length;
+ const newLimit=NEW_LIMIT+extraNew;
  const sentToday=activities.filter(a=>outbound.includes(a.kind)&&dateKey(new Date(a.created_at))===today);
  const newToday=new Set(sentToday.filter(a=>a.kind==='First outreach sent'||a.kind==='Connection request sent').map(a=>a.contact_id)).size;
  const followToday=new Set(sentToday.filter(a=>a.kind==='Follow-up sent').map(a=>a.contact_id)).size;
- return {follow:follow.slice(0,Math.max(0,FOLLOW_LIMIT-followToday)),first:first.slice(0,Math.max(0,NEW_LIMIT-newToday)),followTotal:follow.length,firstTotal:first.length,newToday,followToday};
+ const remaining=Math.max(0,newLimit-newToday);
+ // Retain the ordinary queue order; reserve space for pulled prospects even with a large overdue backlog.
+ const normalSlots=Math.max(0,remaining-pulled.length);
+ return {follow:follow.slice(0,Math.max(0,FOLLOW_LIMIT-followToday)),first:[...normal.slice(0,normalSlots),...pulled].slice(0,remaining),followTotal:follow.length,firstTotal:first.length,newToday,followToday,newLimit,extraNew};
 }
