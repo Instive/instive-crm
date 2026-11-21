@@ -12,24 +12,52 @@ export function researchSource(value:string){try{const u=new URL(value);return u
 export function contactHistory(c:Contact,activities:Activity[]){return activities.filter(a=>a.contact_id===c.id).sort((a,b)=>b.created_at.localeCompare(a.created_at))}
 export function unansweredFollowUps(history:Activity[]){let n=0;for(const a of history){if(replies.includes(a.kind))break;if(a.kind==='Follow-up sent')n++}return n}
 export function campaignTopic(c:Contact){const campaign=noteField(c.notes,'Recommended Campaign');const context=campaign||[c.title,c.industry,c.company].join(' ');if(/carrier email|carrier.*assignment|dispatch/i.test(context))return 'carrier emails, dispatch updates and TMS assignment';if(/rate confirmation|quote|broker/i.test(context))return 'rate confirmations and load details entering the TMS';if(/POD|billing|invoice|accounts payable|finance/i.test(context))return 'POD checks and invoice processing';if(/order entry|ERP|distribution/i.test(context))return 'order emails and ERP data entry';if(/warehouse|WMS/i.test(context))return 'warehouse updates and WMS handoffs';if(/load tender|freight|transport|logistics/i.test(context))return 'load requests and TMS data entry';return 'manual handoffs between email and operational systems'}
-export function opener(c:Contact){const first=firstName(c),g=first?'Hey '+first+',':'Hi,';const company=c.company.trim()?(' at '+c.company.trim()):'';return c.type!=='Direct customer'?g+' I’m building Instive AI to help logistics teams automate repetitive work around their existing systems. Given your background, curious which operational workflow you see clients struggle to automate most?':g+' I’m building Instive AI to help logistics teams cut manual work without replacing their existing systems. Curious how your team'+company+' handles '+campaignTopic(c)+' today — mostly automated, or still some manual work?'}
-export function connectionNote(c:Contact){const n=firstName(c);return (n?'Hi '+n+',':'Hi,')+' I’m building Instive AI around logistics workflow automation. Would be great to connect and exchange perspectives.'}
-export type Draft={text:string;kind:'initial'|'follow'|'review';guidance:string;topic:string};
+
+/** A prepared message is valid only for the precise CRM stage and activity it was researched against.
+ * This prevents re-showing an opener as a follow-up once the user logs that opener as sent.
+ */
+export function personalizedContext(c:Contact,history:Activity[]){
+ const basis=noteField(c.notes,'Personalized basis');
+ const stage=noteField(c.notes,'Personalized status');
+ const draft=noteField(c.notes,'Personalized draft');
+ const connection=noteField(c.notes,'Personalized connection');
+ const insight=noteField(c.notes,'Personalized insight');
+ const source=noteField(c.notes,'Personalized source');
+ const checked=noteField(c.notes,'Personalized checked');
+ const last=contactHistory(c,history)[0]?.id||'none';
+ const alreadySent=Boolean(draft&&history.some(a=>outbound.includes(a.kind)&&a.notes.trim().replace(/\s+/g,' ').toLowerCase()===draft.trim().replace(/\s+/g,' ').toLowerCase()));
+ const valid=Boolean(draft&&basis===last&&stage===c.status&&!alreadySent&&(!source||researchSource(source)));
+ return {draft,connection,insight,source,checked,basis,valid};
+}
+export function connectionNote(c:Contact){return c.status==='New'&&noteField(c.notes,'Personalized basis')==='none'&&noteField(c.notes,'Personalized status')==='New'?noteField(c.notes,'Personalized connection'):''}
+export type Draft={text:string;kind:'initial'|'follow'|'review';guidance:string;topic:string;ready:boolean};
+const noDraft=(guidance:string,topic:string):Draft=>({text:'',kind:'review',guidance,topic,ready:false});
 export function draftFor(c:Contact,history:Activity[]):Draft{
- const topic=campaignTopic(c),g=firstName(c)?'Hey '+firstName(c)+',':'Hi,';
- if(inactive(c)||c.status==='Nurture')return {text:'',kind:'review',guidance:'Do not send outreach; this relationship is paused or closed.',topic};
- if(c.status==='Meeting booked')return {text:'',kind:'review',guidance:'Check meeting details and prepare; do not send a generic follow-up.',topic};
- if(c.status==='New')return {text:researchContext(c).draft||opener(c),kind:'initial',guidance:'Verify current profile and check LinkedIn history first. If not connected, use the connection note instead; do not assume this is a new conversation.',topic};
- const latest=history.find(a=>outbound.includes(a.kind)||replies.includes(a.kind));
- if(latest?.kind==='Connection request sent')return {text:researchContext(c).draft||opener(c),kind:'review',guidance:'Check whether the connection was accepted. If accepted and no DM was sent, you may send this opener; otherwise snooze or pause.',topic};
- const managed=history.some(a=>outbound.includes(a.kind));
- const followups=unansweredFollowUps(history);
- if(followups>=2)return {text:'',kind:'review',guidance:'Two unanswered follow-ups already logged. Pause unless there is a new reply or a clear agreed next step.',topic};
- const saved=noteField(c.notes,'Outreach draft')||researchContext(c).draft||noteField(c.notes,'Suggested LinkedIn follow-up');
- if(!managed&&saved)return {text:saved,kind:'follow',guidance:'Context-based draft. Read the latest LinkedIn thread and confirm this has not already been sent.',topic};
- if(latest&&replies.includes(latest.kind))return {text:'',kind:'review',guidance:'A reply or meeting was logged. Open the latest thread and use Record reply / Log activity to respond with context.',topic};
- if(c.status==='Contacted'||managed){return {text:followups===0?g+' just following up on my earlier note. Is '+topic+' something your team is looking to improve, or is it already covered by your current systems?':g+' I’ll close the loop for now. If reducing manual work around '+topic+' becomes relevant, happy to compare notes. Thanks!',kind:'follow',guidance:'Check the latest thread first. Do not send if they have replied, declined, or the topic is no longer relevant.',topic}}
- return {text:g+' wanted to reconnect on our earlier conversation. Is there a specific operational workflow worth exploring together, or has your focus shifted since we last spoke?',kind:'follow',guidance:'Review the last conversation and tailor the draft before sending.',topic};
+ const topic=campaignTopic(c),historyOrdered=contactHistory(c,history),tailored=personalizedContext(c,historyOrdered);
+ if(inactive(c)||c.status==='Nurture')return noDraft('Outreach paused or closed. Do not send.',topic);
+ if(c.status==='Meeting booked')return noDraft('Prepare for the meeting or log the next agreed step; do not send a generic follow-up.',topic);
+ const latest=historyOrdered.find(a=>outbound.includes(a.kind)||replies.includes(a.kind));
+ const followups=unansweredFollowUps(historyOrdered);
+ if(followups>=2)return noDraft('Two unanswered follow-ups are recorded. Pause unless there is a new reply or agreed next step.',topic);
+ if(c.status==='New'){
+  if(latest)return noDraft('Recorded outreach already exists although the status is New. Review and correct the status before messaging.',topic);
+  if(tailored.valid)return {text:tailored.draft,kind:'initial',guidance:'Research-backed initial DM. Verify the company signal, LinkedIn identity and conversation before sending.',topic,ready:true};
+  const researched=researchContext(c);
+  if(researched.insight&&researchSource(researched.source)&&researched.draft&&
+   !historyOrdered.some(a=>outbound.includes(a.kind)))
+    return {text:researched.draft,kind:'initial',guidance:'Company-specific research draft. Verify the source, current facts and previous messages first.',topic,ready:true};
+  return noDraft('Needs prospect-specific research. Check the person, company, current professional signal and prior messages before drafting.',topic);
+ }
+ if(latest?.kind==='Connection request sent'){
+  if(tailored.valid)return {text:tailored.draft,kind:'review',guidance:'CONNECTION NOT CONFIRMED. Only send this tailored first DM after checking that the request was accepted and no DM has already been sent.',topic,ready:true};
+  return noDraft('Check LinkedIn connection acceptance first. Prepare a personalized first DM for this specific prospect before sending.',topic);
+ }
+ if(tailored.valid)return {text:tailored.draft,kind:'follow',guidance:'Context-specific draft prepared against the latest logged activity. Check the live conversation before sending.',topic,ready:true};
+ if(latest&&replies.includes(latest.kind))return noDraft('A reply or meeting was logged. Review the actual conversation and prepare an individual response, not a generic follow-up.',topic);
+ if(historyOrdered.some(a=>outbound.includes(a.kind)))return noDraft('Needs a NEW, researched follow-up based on the message already sent. Do not repeat an old opener or generic template.',topic);
+ const saved=noteField(c.notes,'Outreach draft')||noteField(c.notes,'Suggested LinkedIn follow-up');
+ if(saved)return {text:saved,kind:'follow',guidance:'Conversation-based historical draft. Verify the latest LinkedIn reply and adapt before sending.',topic,ready:true};
+ return noDraft('No verified context-specific message is available. Research the prospect and prepare a tailored follow-up.',topic);
 }
 export function nextAfterSend(c:Contact,history:Activity[],kind:string,start=new Date()){
  if(kind==='Connection request sent')return {status:c.status==='New'?'Contacted':c.status,date:businessDays(5,start),action:'LinkedIn: check connection acceptance; do not send a duplicate request'};

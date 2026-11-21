@@ -12,3 +12,6 @@
 
 /* Keep notifications out of document flow and preserve the visible row during saves. */
 main[data-page]{overflow-anchor:none}.toast-stack{position:fixed;top:78px;right:22px;z-index:50;display:grid;gap:8px;width:min(440px,calc(100vw - 24px));pointer-events:none}.toast-stack .error,.toast-stack .success{margin:0;box-shadow:0 4px 20px #0e1a2426;pointer-events:auto;border:1px solid currentColor}.toast-stack button{flex-shrink:0;display:flex;align-items:center}.refresh-button{padding:10px 12px}@media(max-width:650px){.toast-stack{right:12px}.refresh-button span{display:none}.refresh-button{padding:10px}.top .actions{gap:5px;flex-wrap:nowrap}}
+
+/* Message review rather than generic fallbacks */
+.draft-needs-research{background:#fbf7ef;border:1px solid #ead3ad;border-left:3px solid #c28b37;border-radius:8px;padding:12px 14px}.draft-needs-research strong{font-size:13px}.draft-needs-research p{font-size:12px;margin-top:6px;line-height:1.5;color:var(--muted)}
