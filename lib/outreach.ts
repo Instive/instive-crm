@@ -60,31 +60,31 @@ const noDraft=(guidance:string,topic:string):Draft=>({text:'',kind:'review',guid
 export function draftFor(c:Contact,history:Activity[]):Draft{
  const topic=campaignTopic(c),historyOrdered=contactHistory(c,history),tailored=personalizedContext(c,historyOrdered);
  if(inactive(c)||c.status==='Nurture')return noDraft('Outreach paused or closed. Do not send.',topic);
- if(c.status==='Meeting booked')return noDraft('Prepare for the meeting or log the next agreed step; do not send a generic follow-up.',topic);
+ if(c.status==='Meeting booked')return noDraft('Prepare for the meeting. No generic follow-up.',topic);
  const latest=historyOrdered.find(a=>outbound.includes(a.kind)||replies.includes(a.kind));
  const followups=unansweredFollowUps(historyOrdered);
- if(followups>=2)return noDraft('Two unanswered follow-ups are recorded. Pause unless there is a new reply or agreed next step.',topic);
+ if(followups>=2)return noDraft('Two unanswered follow-ups. Pause until a reply.',topic);
  if(c.status==='New'){
-  if(needsLinkedinMessageReview(c))return noDraft('Connection verified from LinkedIn export. Prior DMs are unknown; review the LinkedIn conversation before suggesting a new opener.',topic);
-  if(exportedLinkedinInvitation(c)&&!verifiedLinkedinConnection(c))return noDraft('An outgoing LinkedIn invitation is recorded in your export. Verify acceptance before sending a first message; never send a duplicate request.',topic);
-  if(latest)return noDraft('Recorded outreach already exists although the status is New. Review and correct the status before messaging.',topic);
-  if(tailored.valid)return {text:tailored.draft,kind:'initial',guidance:'Research-backed initial DM. Verify the company signal, LinkedIn identity and conversation before sending.',topic,ready:true};
+  if(needsLinkedinMessageReview(c))return noDraft('Connected. Check past DMs before drafting.',topic);
+  if(exportedLinkedinInvitation(c)&&!verifiedLinkedinConnection(c))return noDraft('Invitation sent. Check acceptance. Don't resend.',topic);
+  if(latest)return noDraft('Outreach logged. Review status before sending.',topic);
+  if(tailored.valid)return {text:tailored.draft,kind:'initial',guidance:'Research ready. Check source and LinkedIn chat.',topic,ready:true};
   const researched=researchContext(c);
   if(researched.insight&&researchSource(researched.source)&&researched.draft&&
    !historyOrdered.some(a=>outbound.includes(a.kind)))
-    return {text:researched.draft,kind:'initial',guidance:'Company-specific research draft. Verify the source, current facts and previous messages first.',topic,ready:true};
-  return noDraft('Needs prospect-specific research. Check the person, company, current professional signal and prior messages before drafting.',topic);
+    return {text:researched.draft,kind:'initial',guidance:'Check company source and past DMs.',topic,ready:true};
+  return noDraft('Needs research. Verify profile and chat.',topic);
  }
  if(latest?.kind==='Connection request sent'){
-  if(tailored.valid)return {text:tailored.draft,kind:'review',guidance:'CONNECTION NOT CONFIRMED. Only send this tailored first DM after checking that the request was accepted and no DM has already been sent.',topic,ready:true};
-  return noDraft('Check LinkedIn connection acceptance first. Prepare a personalized first DM for this specific prospect before sending.',topic);
+  if(tailored.valid)return {text:tailored.draft,kind:'review',guidance:'Connection unconfirmed. Check acceptance before DM.',topic,ready:true};
+  return noDraft('Check acceptance. Prepare a personal DM.',topic);
  }
- if(tailored.valid)return {text:tailored.draft,kind:'follow',guidance:'Context-specific draft prepared against the latest logged activity. Check the live conversation before sending.',topic,ready:true};
- if(latest&&replies.includes(latest.kind))return noDraft('A reply or meeting was logged. Review the actual conversation and prepare an individual response, not a generic follow-up.',topic);
- if(historyOrdered.some(a=>outbound.includes(a.kind)))return noDraft('Needs a NEW, researched follow-up based on the message already sent. Do not repeat an old opener or generic template.',topic);
+ if(tailored.valid)return {text:tailored.draft,kind:'follow',guidance:'Check live thread before sending.',topic,ready:true};
+ if(latest&&replies.includes(latest.kind))return noDraft('Reply logged. Respond to the actual message.',topic);
+ if(historyOrdered.some(a=>outbound.includes(a.kind)))return noDraft('Research a new follow-up. Don't repeat old messages.',topic);
  const saved=noteField(c.notes,'Outreach draft')||noteField(c.notes,'Suggested LinkedIn follow-up');
- if(saved)return {text:saved,kind:'follow',guidance:'Conversation-based historical draft. Verify the latest LinkedIn reply and adapt before sending.',topic,ready:true};
- return noDraft('No verified context-specific message is available. Research the prospect and prepare a tailored follow-up.',topic);
+ if(saved)return {text:saved,kind:'follow',guidance:'Review live thread and adjust draft.',topic,ready:true};
+ return noDraft('No verified draft. Research this prospect.',topic);
 }
 export function nextAfterSend(c:Contact,history:Activity[],kind:string,start=new Date()){
  if(kind==='Connection request sent')return {status:c.status==='New'?'Contacted':c.status,date:businessDays(5,start),action:'LinkedIn: check connection acceptance; do not send a duplicate request'};
