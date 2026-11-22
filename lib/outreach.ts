@@ -66,7 +66,7 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
  if(followups>=2)return noDraft('Two unanswered follow-ups. Pause until a reply.',topic);
  if(c.status==='New'){
   if(needsLinkedinMessageReview(c))return noDraft('Connected. Check past DMs before drafting.',topic);
-  if(exportedLinkedinInvitation(c)&&!verifiedLinkedinConnection(c))return noDraft('Invitation sent. Check acceptance. Don't resend.',topic);
+  if(exportedLinkedinInvitation(c)&&!verifiedLinkedinConnection(c))return noDraft('Invitation sent. Check acceptance. Do not resend.',topic);
   if(latest)return noDraft('Outreach logged. Review status before sending.',topic);
   if(tailored.valid)return {text:tailored.draft,kind:'initial',guidance:'Research ready. Check source and LinkedIn chat.',topic,ready:true};
   const researched=researchContext(c);
@@ -81,7 +81,7 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
  }
  if(tailored.valid)return {text:tailored.draft,kind:'follow',guidance:'Check live thread before sending.',topic,ready:true};
  if(latest&&replies.includes(latest.kind))return noDraft('Reply logged. Respond to the actual message.',topic);
- if(historyOrdered.some(a=>outbound.includes(a.kind)))return noDraft('Research a new follow-up. Don't repeat old messages.',topic);
+ if(historyOrdered.some(a=>outbound.includes(a.kind)))return noDraft('Research a new follow-up. Avoid repeated messages.',topic);
  const saved=noteField(c.notes,'Outreach draft')||noteField(c.notes,'Suggested LinkedIn follow-up');
  if(saved)return {text:saved,kind:'follow',guidance:'Review live thread and adjust draft.',topic,ready:true};
  return noDraft('No verified draft. Research this prospect.',topic);
