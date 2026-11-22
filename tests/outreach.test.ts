@@ -82,3 +82,14 @@ test('no eligible assignment when company has a suppressed or active record',()=
  const suppressed={...c('Suppressed','Do not contact',null),company:'X Freight'};
  assert.deepEqual(nextOutboundBatch([lead,suppressed],[],'2026-11-22').items,[]);
 });
+
+test('the available-pool summary explains why unscheduled leads cannot be assigned',()=>{
+ const eligible={...c('Founder','New',null),title:'Founder',company:'Independent Freight',notes:'Research'};
+ const blocked={...c('Other','New',null),title:'VP',company:'Busy Logistics',notes:'Research'};
+ const contacted={...c('Contacted','Contacted','2026-11-25'),company:'Busy Logistics'};
+ const missing={...c('No profile','New',null),company:'Unknown',title:'CEO',linkedin:''};
+ const pool=nextOutboundBatch([eligible,blocked,contacted,missing],[],'2026-11-22');
+ assert.equal(pool.pool.unscheduled,3);assert.equal(pool.pool.withProfile,2);assert.equal(pool.pool.withoutProfile,1);
+ assert.equal(pool.pool.blockedByCompany,1);
+ assert.deepEqual(pool.items.map(x=>x.name),['Founder']);
+});
