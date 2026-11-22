@@ -10,7 +10,7 @@ test('accept genuine country LinkedIn profile subdomains but reject lookalikes',
 test('sourced research draft works for a new lead, historical warm draft only before a recorded outbound',()=>{const x={...c('Alex'),notes:'Research checked: 2026-11-15\nResearch insight: Company offers tracking\nResearch source: https://example.com/\nResearch outreach draft: Hey Alex, how do exceptions work?'};assert.equal(draftFor(x,[]).text,'Hey Alex, how do exceptions work?');assert.equal(researchContext(x).checked,'2026-11-15');assert.equal(researchSource('javascript:alert(1)'),null);assert.equal(draftFor({...x,status:'Replied',notes:x.notes+'\nOutreach draft: Manual draft'},[]).text,'Manual draft');assert.equal(draftFor({...x,status:'Contacted'},[a('Alex','First outreach sent')]).text,'')});
 
 test('extra outbounds pull from earliest future date only, in priority order',()=>{
- const rows=[c('Tomorrow low','New','2026-11-17'),c('Tomorrow high','New','2026-11-17'),c('Later','New','2026-11-18'),c('Warm','Interested','2026-11-17'),c('Already sent','New','2026-11-17'),{...c('No profile','New','2026-11-17'),linkedin:''}];
+ const rows=[c('Tomorrow low','New','2026-11-17'),c('Tomorrow high','New','2026-11-17'),c('Later','New','2026-11-18'),c('Warm','Interested','2026-11-17'),c('Already sent','New','2026-11-17'),{...c('No profile','New','2026-11-17'),linkedin:''}];rows.forEach((r,i)=>{r.company='Unique freight '+i;r.title='Operations';});
  rows[0].priority='Low';
  const batch=nextOutboundBatch(rows,[a('Already sent','First outreach sent')],'2026-11-16');
  assert.equal(batch.date,'2026-11-17');assert.deepEqual(batch.items.map(x=>x.name),['Tomorrow high','Tomorrow low']);

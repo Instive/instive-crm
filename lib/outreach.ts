@@ -75,11 +75,12 @@ export function pullForwardNotes(c:Contact,day:string){return pulledForwardToday
 // Never reassign an active or suppressed company's additional contacts, or anyone with recorded outreach.
 export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today=dateKey()){
  const contacted=new Set(activities.filter(a=>outbound.includes(a.kind)||replies.includes(a.kind)).map(a=>a.contact_id));
- const companyKey=(c:Contact)=>c.company.trim().toLowerCase().replace(/\s+/g,' ');
+ const companyKey=(c:Contact)=>c.company.trim().toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
  const linkedinKey=(c:Contact)=>{const url=linkedinProfile(c);return url?new URL(url).pathname.toLowerCase().replace(/\/$/,''):''};
  const badCompany=(company:string)=>/^(?:chief\s|co[- ]?founder\b|founder\b|president\b|director\b|vice president\b|vp\b|ceo\b|coo\b|cfo\b|cto\b|owner\b|head of\b|operations manager\b|sales manager\b|logistics manager\b|managing director\b)/i.test(company.trim());
  const blocked=new Set(contacts.filter(c=>c.status!=='New'||c.next_date!==null).map(companyKey).filter(Boolean));
- const valid=(c:Contact)=>c.status==='New'&&!contacted.has(c.id)&&linkedinProfile(c)!==null&&!pulledForwardToday(c,today)&&Boolean(companyKey(c))&&!badCompany(c.company);
+ const valid=(c:Contact)=>c.status==='New'&&!contacted.has(c.id)&&linkedinProfile(c)!==null&&!pulledForwardToday(c,today)&&Boolean(companyKey(c))&&!badCompany(c.company)&&
+  !contacts.some(x=>x.id!==c.id&&companyKey(x)===companyKey(c)&&(x.status!=='New'||x.next_date!==null));
  const future=sortFollowUps(contacts.filter(c=>valid(c)&&c.next_date!==null&&c.next_date>today));
  const date=future[0]?.next_date??null;
  const scheduled=date?future.filter(c=>c.next_date===date):[];
