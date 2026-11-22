@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,actualLinkedinActionDay,defaultManualMessageKind,canRecordPastRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
 const c=(name:string,status='New',next_date:string|null='2026-11-16'):Contact=>({...blank,id:name,workspace_id:'w',name,status,next_date,created_at:'',priority:'High',linkedin:'https://www.linkedin.com/in/'+encodeURIComponent(name)});
 const a=(contact_id:string,kind:string,created_at='2026-11-16T09:00:00'):Activity=>({id:contact_id+kind,workspace_id:'w',contact_id,kind,channel:'LinkedIn',notes:'',created_at});
 test('never fabricate generic opener from a campaign alone',()=>{const x={...c('Alex'),company:'Freight Co',notes:'Recommended Campaign: Campaign 2 — Carrier Email → TMS Assignment'};assert.equal(draftFor(x,[]).text,'');assert.equal(draftFor(x,[]).ready,false);assert.equal(connectionNote(x),'')});
@@ -121,4 +121,22 @@ test('an exhausted LinkedIn pool reports connections awaiting history review sep
  assert.equal(plan.pool.pendingHistoryReview,1);
  assert.equal(plan.pool.withoutProfile,1);
  assert.equal(plan.pool.blockedByCompany,0);
+});
+
+test('manual sent messages do not require any prewritten personalized draft',()=>{
+ const contact={...c('Andrew','New','2026-11-22'),company:'NUAGE Logistics Inc.',notes:'LinkedIn connection verified: 15 Oct 2026\nLinkedIn opener review: no prior DM confirmed by user on 2026-11-22'};
+ assert.equal(draftFor(contact,[]).ready,false);
+ assert.equal(defaultManualMessageKind(contact,[]),'First outreach sent');
+ assert.equal(canRecordPastRequest(contact,[]),true);
+ assert.equal(defaultManualMessageKind({...contact,status:'Contacted'},[a('Andrew','First outreach sent')]),'Follow-up sent');
+ assert.equal(canRecordPastRequest(contact,[a('Andrew','Connection request sent')]),false);
+});
+test('manual backfills count on their actual sent day rather than date entered in CRM',()=>{
+ const contact={...c('Andrew','Contacted','2026-11-25'),company:'NUAGE Logistics Inc.'};
+ const historical={...a('Andrew','First outreach sent','2026-11-22T12:00:00Z'),notes:'Actual LinkedIn send date: 2026-11-18\nRecorded manually in CRM on 2026-11-22'};
+ assert.equal(actualLinkedinActionDay(historical),'2026-11-18');
+ assert.equal(dailyQueue([contact],[historical],'2026-11-22').newToday,0);
+ assert.equal(dailyQueue([contact],[historical],'2026-11-18').newToday,1);
+ const todayEntry={...historical,notes:'Actual LinkedIn send date: 2026-11-22\nRecorded manually in CRM on 2026-11-22'};
+ assert.equal(dailyQueue([contact],[todayEntry],'2026-11-22').newToday,1);
 });

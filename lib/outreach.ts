@@ -37,6 +37,23 @@ export function canSendConnectionRequest(c:Contact,history:Activity[]){
  return c.status==='New'&&!inactive(c)&&!verifiedLinkedinConnection(c)&&!exportedLinkedinInvitation(c)&&
  !history.some(a=>outbound.includes(a.kind)||replies.includes(a.kind));
 }
+export type ManualLinkedinAction='First outreach sent'|'Follow-up sent'|'Connection request sent';
+/** The event's creation timestamp is when the CRM entry was saved; if provided,
+ * the independently verified LinkedIn send date is carried in activity notes.
+ * Never count historical backfills as messages newly sent today.
+ */
+export function actualLinkedinActionDay(a:Pick<Activity,'notes'|'created_at'>){
+ const marked=a.notes.match(/(?:^|\n)Actual LinkedIn send date: (\d{4}-\d{2}-\d{2})(?:\n|$)/);
+ return marked?.[1]??dateKey(new Date(a.created_at));
+}
+export function defaultManualMessageKind(c:Contact,history:Activity[]):ManualLinkedinAction{
+ const previouslySent=history.some(a=>['First outreach sent','Follow-up sent','Sent'].includes(a.kind))||
+ c.notes.includes('LinkedIn opener review: previous opener confirmed');
+ return previouslySent?'Follow-up sent':'First outreach sent';
+}
+export function canRecordPastRequest(c:Contact,history:Activity[]){
+ return !inactive(c)&&!history.some(a=>a.kind==='Connection request sent');
+}
 export function connectionNote(c:Contact){return c.status==='New'&&noteField(c.notes,'Personalized basis')==='none'&&noteField(c.notes,'Personalized status')==='New'?noteField(c.notes,'Personalized connection'):''}
 export type Draft={text:string;kind:'initial'|'follow'|'review';guidance:string;topic:string;ready:boolean};
 const noDraft=(guidance:string,topic:string):Draft=>({text:'',kind:'review',guidance,topic,ready:false});
@@ -121,7 +138,7 @@ export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKe
  const normal=first.filter(c=>!pulledForwardToday(c,today));
  const extraNew=contacts.filter(c=>pulledForwardToday(c,today)).length;
  const newLimit=NEW_LIMIT+extraNew;
- const sentToday=activities.filter(a=>outbound.includes(a.kind)&&dateKey(new Date(a.created_at))===today);
+ const sentToday=activities.filter(a=>outbound.includes(a.kind)&&actualLinkedinActionDay(a)===today);
  const newToday=new Set(sentToday.filter(a=>a.kind==='First outreach sent'||a.kind==='Connection request sent').map(a=>a.contact_id)).size;
  const followToday=new Set(sentToday.filter(a=>a.kind==='Follow-up sent').map(a=>a.contact_id)).size;
  const remaining=Math.max(0,newLimit-newToday);
