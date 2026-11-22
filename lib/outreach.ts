@@ -4,7 +4,7 @@ export const NEW_LIMIT=5;
 export const FOLLOW_LIMIT=12;
 const outbound=['First outreach sent','Follow-up sent','Connection request sent'];
 const replies=['Reply received','Positive reply','Meeting booked','Meeting completed','Reply','Meeting'];
-export function linkedinProfile(c:Contact){try{const u=new URL(c.linkedin);return u.protocol==='https:'&&['linkedin.com','www.linkedin.com'].includes(u.hostname.toLowerCase())&&u.pathname.startsWith('/in/')?u.href:null}catch{return null}}
+export function linkedinProfile(c:Contact){try{const u=new URL(c.linkedin);return u.protocol==='https:'&&(u.hostname.toLowerCase()==='linkedin.com'||u.hostname.toLowerCase().endsWith('.linkedin.com'))&&/^\/in\/[^/]+/i.test(u.pathname)?u.href:null}catch{return null}}
 export function firstName(c:Contact){if(/\b(llc|ltd|inc|logistics llc|surname unavailable)\b/i.test(c.name))return '';return c.name.trim().replace(/^[^\p{L}]+/u,'').split(/\s+/)[0]||''}
 export function noteField(notes:string,label:string){const line=notes.split(/\r?\n/).reverse().find(l=>l.startsWith(label+':'));return line?.slice(label.length+1).trim()||''}
 export function researchContext(c:Contact){return {insight:noteField(c.notes,'Research insight'),source:noteField(c.notes,'Research source'),checked:noteField(c.notes,'Research checked'),draft:noteField(c.notes,'Research outreach draft')}}
@@ -71,11 +71,31 @@ export function nextAfterSend(c:Contact,history:Activity[],kind:string,start=new
 const pullMarker=(day:string)=>'Outbound pulled forward: '+day;
 export function pulledForwardToday(c:Contact,day:string){return c.notes.split(/\r?\n/).some(line=>line.trim()===pullMarker(day))}
 export function pullForwardNotes(c:Contact,day:string){return pulledForwardToday(c,day)?c.notes:[c.notes,pullMarker(day)].filter(Boolean).join('\n')}
+// Earliest future scheduled batch first; then top up with researched, unscheduled LinkedIn prospects.
+// Never reassign an active or suppressed company's additional contacts, or anyone with recorded outreach.
 export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today=dateKey()){
- const alreadySent=new Set(activities.filter(a=>outbound.includes(a.kind)).map(a=>a.contact_id));
- const eligible=sortFollowUps(contacts.filter(c=>c.status==='New'&&c.next_date&&c.next_date>today&&linkedinProfile(c)!==null&&!alreadySent.has(c.id)&&!pulledForwardToday(c,today)));
- const date=eligible[0]?.next_date??null;
- return {date,items:date?eligible.filter(c=>c.next_date===date):[]};
+ const contacted=new Set(activities.filter(a=>outbound.includes(a.kind)||replies.includes(a.kind)).map(a=>a.contact_id));
+ const companyKey=(c:Contact)=>c.company.trim().toLowerCase().replace(/\s+/g,' ');
+ const linkedinKey=(c:Contact)=>{const url=linkedinProfile(c);return url?new URL(url).pathname.toLowerCase().replace(/\/$/,''):''};
+ const badCompany=(company:string)=>/^(?:chief\s|co[- ]?founder\b|founder\b|president\b|director\b|vice president\b|vp\b|ceo\b|coo\b|cfo\b|cto\b|owner\b|head of\b|operations manager\b|sales manager\b|logistics manager\b|managing director\b)/i.test(company.trim());
+ const blocked=new Set(contacts.filter(c=>c.status!=='New'||c.next_date!==null).map(companyKey).filter(Boolean));
+ const valid=(c:Contact)=>c.status==='New'&&!contacted.has(c.id)&&linkedinProfile(c)!==null&&!pulledForwardToday(c,today)&&Boolean(companyKey(c))&&!badCompany(c.company);
+ const future=sortFollowUps(contacts.filter(c=>valid(c)&&c.next_date!==null&&c.next_date>today));
+ const date=future[0]?.next_date??null;
+ const scheduled=date?future.filter(c=>c.next_date===date):[];
+ const unscheduled=sortFollowUps(contacts.filter(c=>valid(c)&&c.next_date===null&&
+  c.priority!=='Low'&&c.name.trim()&&c.title.trim()&&c.notes.trim()&&
+  !blocked.has(companyKey(c))));
+ const companies=new Set<string>();
+ const profiles=new Set<string>();
+ const unique=(rows:Contact[])=>rows.filter(c=>{
+   const company=companyKey(c),profile=linkedinKey(c);
+   if(!profile||companies.has(company)||profiles.has(profile))return false;
+   companies.add(company);profiles.add(profile);return true;
+ });
+ const scheduledUnique=unique(scheduled);
+ const unscheduledUnique=unique(unscheduled);
+ return {date,items:[...scheduledUnique,...unscheduledUnique],scheduledCount:scheduledUnique.length,unscheduledCount:unscheduledUnique.length};
 }
 export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKey()){
  const due=contacts.filter(c=>!inactive(c)&&c.status!=='Nurture'&&c.next_date&&c.next_date<=today);

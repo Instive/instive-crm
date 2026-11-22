@@ -5,7 +5,7 @@ test('never fabricate generic opener from a campaign alone',()=>{const x={...c('
 test('saved warm draft used only before new outbound history',()=>{const x={...c('Alex','Replied'),notes:'Suggested LinkedIn follow-up: Hi Alex, project scope?'};assert.equal(draftFor(x,[]).text,'Hi Alex, project scope?');assert.notEqual(draftFor(x,[a('Alex','Follow-up sent')]).text,'Hi Alex, project scope?')});
 test('connection review and two follow-up limit',()=>{const x=c('Alex','Contacted');assert.equal(draftFor(x,[a('Alex','Connection request sent')]).text,'');assert.equal(nextAfterSend(x,[a('Alex','Follow-up sent')],'Follow-up sent',new Date(2026,10,16,12)).status,'Nurture');assert.equal(nextAfterSend(x,[],'First outreach sent',new Date(2026,10,16,12)).date,'2026-11-19')});
 test('daily queue respects status, dates and caps',()=>{const rows=Array.from({length:8},(_,i)=>c('New '+i));rows.push(c('Warm','Interested'),c('Paused','Nurture'),c('Closed','Do not contact'),c('Later','New','2026-11-17'));const plan=dailyQueue(rows,[a('Different','First outreach sent')],'2026-11-16');assert.equal(plan.first.length,4);assert.equal(plan.follow.length,1);assert.equal(plan.follow[0].name,'Warm')});
-test('reject unsafe LinkedIn URLs',()=>{assert.equal(linkedinProfile({...c('A'),linkedin:'https://linkedin.com.evil.test/in/a'}),null);assert.ok(linkedinProfile({...c('A'),linkedin:'https://www.linkedin.com/in/a'}))});
+test('accept genuine country LinkedIn profile subdomains but reject lookalikes',()=>{assert.equal(linkedinProfile({...c('A'),linkedin:'https://linkedin.com.evil.test/in/a'}),null);assert.equal(linkedinProfile({...c('A'),linkedin:'http://uk.linkedin.com/in/a'}),null);assert.equal(linkedinProfile({...c('A'),linkedin:'https://uk.linkedin.com/not-a-profile'}),null);assert.ok(linkedinProfile({...c('A'),linkedin:'https://www.linkedin.com/in/a'}));assert.ok(linkedinProfile({...c('A'),linkedin:'https://uk.linkedin.com/in/a'}));assert.ok(linkedinProfile({...c('A'),linkedin:'https://nl.linkedin.com/in/a'}))});
 
 test('sourced research draft works for a new lead, historical warm draft only before a recorded outbound',()=>{const x={...c('Alex'),notes:'Research checked: 2026-11-15\nResearch insight: Company offers tracking\nResearch source: https://example.com/\nResearch outreach draft: Hey Alex, how do exceptions work?'};assert.equal(draftFor(x,[]).text,'Hey Alex, how do exceptions work?');assert.equal(researchContext(x).checked,'2026-11-15');assert.equal(researchSource('javascript:alert(1)'),null);assert.equal(draftFor({...x,status:'Replied',notes:x.notes+'\nOutreach draft: Manual draft'},[]).text,'Manual draft');assert.equal(draftFor({...x,status:'Contacted'},[a('Alex','First outreach sent')]).text,'')});
 
@@ -52,4 +52,33 @@ test('connection option appears for New prospects even when no researched DM exi
 test('connection option hides after sent request, DM, reply, or closed status',()=>{
  const x=c('Sam');for(const kind of ['Connection request sent','First outreach sent','Follow-up sent','Reply received'])assert.equal(canSendConnectionRequest(x,[a('Sam',kind)]),false);
  for(const status of ['Contacted','Nurture','Do not contact','Not interested','Converted'])assert.equal(canSendConnectionRequest({...x,status},[]),false);
+});
+
+test('extra outbounds use unscheduled researched prospects after the future-dated list is empty',()=>{
+ const a1={...c('A','New',null),company:'Alpha Logistics',title:'CEO',notes:'Research only; profile to verify',priority:'High'};
+ const b1={...c('B','New',null),company:'Beta Freight',title:'Head of Operations',notes:'Researched company',priority:'Medium'};
+ const b2={...c('C','New',null),company:'Beta Freight',title:'Director',notes:'Researched company',priority:'Medium'};
+ const paused={...c('D','Nurture',null),company:'Gamma Logistics'};
+ const blocked={...c('E','New',null),company:'Gamma Logistics',title:'Owner',notes:'Research'};
+ const old={...c('F','New',null),company:'Old Freight',title:'Founder',notes:'Research'};
+ const missing={...c('G','New',null),company:'Missing Freight',title:'Founder',notes:'Research',linkedin:''};
+ const batch=nextOutboundBatch([b1,blocked,paused,b2,a1,old,missing],[a('F','Connection request sent')],'2026-11-22');
+ assert.equal(batch.date,null);assert.equal(batch.scheduledCount,0);assert.equal(batch.unscheduledCount,2);
+ assert.deepEqual(batch.items.map(x=>x.name),['A','B']);
+ const pulled={...a1,next_date:'2026-11-22',notes:pullForwardNotes(a1,'2026-11-22')};
+ const plan=dailyQueue([pulled],[],'2026-11-22');
+ assert.equal(plan.newLimit,6);assert.deepEqual(plan.first.map(c=>c.name),['A']);
+});
+test('top-up fills from unscheduled after earliest scheduled future batch, skipping duplicate company',()=>{
+ const future={...c('Future','New','2026-11-24'),company:'One Ltd',title:'Director',notes:'Research',priority:'High'};
+ const unsched={...c('New pool','New',null),company:'Two Ltd',title:'CEO',notes:'Research',priority:'Medium'};
+ const duplicate={...c('Duplicate','New',null),company:'One Ltd',title:'CEO',notes:'Research',priority:'High'};
+ const batch=nextOutboundBatch([future,unsched,duplicate],[],'2026-11-22');
+ assert.equal(batch.date,'2026-11-24');assert.equal(batch.scheduledCount,1);assert.equal(batch.unscheduledCount,1);
+ assert.deepEqual(batch.items.map(x=>x.name),['Future','New pool']);
+});
+test('no eligible assignment when company has a suppressed or active record',()=>{
+ const lead={...c('Lead','New',null),company:'X Freight',title:'Operations Director',notes:'Research'};
+ const suppressed={...c('Suppressed','Do not contact',null),company:'X Freight'};
+ assert.deepEqual(nextOutboundBatch([lead,suppressed],[],'2026-11-22').items,[]);
 });
