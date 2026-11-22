@@ -30,7 +30,13 @@ export function personalizedContext(c:Contact,history:Activity[]){
  return {draft,connection,insight,source,checked,basis,valid};
 }
 /** Allow a request even without a DM draft, but never if outreach or a reply was logged. */
-export function canSendConnectionRequest(c:Contact,history:Activity[]){return c.status==='New'&&!inactive(c)&&!history.some(a=>outbound.includes(a.kind)||replies.includes(a.kind));}
+export function verifiedLinkedinConnection(c:Contact){return noteField(c.notes,'LinkedIn connection verified')}
+export function exportedLinkedinInvitation(c:Contact){return noteField(c.notes,'LinkedIn invitation exported')}
+export function needsLinkedinMessageReview(c:Contact){return c.notes.includes('LinkedIn opener history: NOT VERIFIED')&&!c.notes.includes('LinkedIn opener review:')}
+export function canSendConnectionRequest(c:Contact,history:Activity[]){
+ return c.status==='New'&&!inactive(c)&&!verifiedLinkedinConnection(c)&&!exportedLinkedinInvitation(c)&&
+ !history.some(a=>outbound.includes(a.kind)||replies.includes(a.kind));
+}
 export function connectionNote(c:Contact){return c.status==='New'&&noteField(c.notes,'Personalized basis')==='none'&&noteField(c.notes,'Personalized status')==='New'?noteField(c.notes,'Personalized connection'):''}
 export type Draft={text:string;kind:'initial'|'follow'|'review';guidance:string;topic:string;ready:boolean};
 const noDraft=(guidance:string,topic:string):Draft=>({text:'',kind:'review',guidance,topic,ready:false});
@@ -42,6 +48,8 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
  const followups=unansweredFollowUps(historyOrdered);
  if(followups>=2)return noDraft('Two unanswered follow-ups are recorded. Pause unless there is a new reply or agreed next step.',topic);
  if(c.status==='New'){
+  if(needsLinkedinMessageReview(c))return noDraft('Connection verified from LinkedIn export. Prior DMs are unknown; review the LinkedIn conversation before suggesting a new opener.',topic);
+  if(exportedLinkedinInvitation(c)&&!verifiedLinkedinConnection(c))return noDraft('An outgoing LinkedIn invitation is recorded in your export. Verify acceptance before sending a first message; never send a duplicate request.',topic);
   if(latest)return noDraft('Recorded outreach already exists although the status is New. Review and correct the status before messaging.',topic);
   if(tailored.valid)return {text:tailored.draft,kind:'initial',guidance:'Research-backed initial DM. Verify the company signal, LinkedIn identity and conversation before sending.',topic,ready:true};
   const researched=researchContext(c);
@@ -82,7 +90,7 @@ export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today
  const unscheduledAll=contacts.filter(c=>c.status==='New'&&c.next_date===null);
  const unscheduledWithProfile=unscheduledAll.filter(c=>linkedinProfile(c)!==null);
  const blockedByCompany=unscheduledWithProfile.filter(c=>blocked.has(companyKey(c))).length;
- const valid=(c:Contact)=>c.status==='New'&&!contacted.has(c.id)&&linkedinProfile(c)!==null&&!pulledForwardToday(c,today)&&Boolean(companyKey(c))&&!badCompany(c.company)&&
+ const valid=(c:Contact)=>c.status==='New'&&!contacted.has(c.id)&&!needsLinkedinMessageReview(c)&&!exportedLinkedinInvitation(c)&&linkedinProfile(c)!==null&&!pulledForwardToday(c,today)&&Boolean(companyKey(c))&&!badCompany(c.company)&&
   !contacts.some(x=>x.id!==c.id&&companyKey(x)===companyKey(c)&&(x.status!=='New'||x.next_date!==null));
  const future=sortFollowUps(contacts.filter(c=>valid(c)&&c.next_date!==null&&c.next_date>today));
  const date=future[0]?.next_date??null;

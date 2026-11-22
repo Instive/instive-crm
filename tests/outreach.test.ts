@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
 const c=(name:string,status='New',next_date:string|null='2026-11-16'):Contact=>({...blank,id:name,workspace_id:'w',name,status,next_date,created_at:'',priority:'High',linkedin:'https://www.linkedin.com/in/'+encodeURIComponent(name)});
 const a=(contact_id:string,kind:string,created_at='2026-11-16T09:00:00'):Activity=>({id:contact_id+kind,workspace_id:'w',contact_id,kind,channel:'LinkedIn',notes:'',created_at});
 test('never fabricate generic opener from a campaign alone',()=>{const x={...c('Alex'),company:'Freight Co',notes:'Recommended Campaign: Campaign 2 — Carrier Email → TMS Assignment'};assert.equal(draftFor(x,[]).text,'');assert.equal(draftFor(x,[]).ready,false);assert.equal(connectionNote(x),'')});
@@ -92,4 +92,23 @@ test('the available-pool summary explains why unscheduled leads cannot be assign
  assert.equal(pool.pool.unscheduled,3);assert.equal(pool.pool.withProfile,2);assert.equal(pool.pool.withoutProfile,1);
  assert.equal(pool.pool.blockedByCompany,1);
  assert.deepEqual(pool.items.map(x=>x.name),['Founder']);
+});
+
+test('LinkedIn archive connection blocks duplicate connection request and outreach until history review',()=>{
+ const c0={...c('A','New',null),company:'Freight Corp',title:'CEO',notes:'LinkedIn connection verified: 20 Nov 2026\nLinkedIn opener history: NOT VERIFIED\nResearch insight: Carrier updates\nResearch source: https://example.com\nResearch outreach draft: Hey A, how do you handle updates?'};
+ assert.equal(verifiedLinkedinConnection(c0),'20 Nov 2026');
+ assert.equal(needsLinkedinMessageReview(c0),true);
+ assert.equal(canSendConnectionRequest(c0,[]),false);
+ assert.equal(draftFor(c0,[]).ready,false);
+ assert.equal(nextOutboundBatch([c0],[],'2026-11-22').items.length,0);
+ const reviewed={...c0,notes:c0.notes+'\nLinkedIn opener review: no prior DM confirmed by user on 2026-11-22'};
+ assert.equal(needsLinkedinMessageReview(reviewed),false);
+ assert.equal(draftFor(reviewed,[]).ready,true);
+ assert.deepEqual(nextOutboundBatch([reviewed],[],'2026-11-22').items.map(x=>x.id),['A']);
+});
+test('Outgoing invitation in archive suppresses repeated requests without asserting acceptance',()=>{
+ const c0={...c('A','New',null),company:'Freight Corp',title:'CEO',notes:'LinkedIn invitation exported: 11/22/26, 12:45 AM; acceptance unknown'};
+ assert.ok(exportedLinkedinInvitation(c0));assert.equal(canSendConnectionRequest(c0,[]),false);
+ assert.equal(draftFor(c0,[]).ready,false);
+ assert.equal(nextOutboundBatch([c0],[],'2026-11-22').items.length,0);
 });
