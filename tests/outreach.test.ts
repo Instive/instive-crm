@@ -112,3 +112,13 @@ test('Outgoing invitation in archive suppresses repeated requests without assert
  assert.equal(draftFor(c0,[]).ready,false);
  assert.equal(nextOutboundBatch([c0],[],'2026-11-22').items.length,0);
 });
+
+test('an exhausted LinkedIn pool reports connections awaiting history review separately',()=>{
+ const needs={...c('Review','New',null),company:'Uncontacted Freight',title:'CEO',priority:'High',notes:'LinkedIn connection verified: 20 Nov 2026\nLinkedIn opener history: NOT VERIFIED'};
+ const noProfile={...c('Missing','New',null),company:'Another Freight',title:'VP',linkedin:''};
+ const plan=nextOutboundBatch([needs,noProfile],[],'2026-11-22');
+ assert.equal(plan.items.length,0);
+ assert.equal(plan.pool.pendingHistoryReview,1);
+ assert.equal(plan.pool.withoutProfile,1);
+ assert.equal(plan.pool.blockedByCompany,0);
+});

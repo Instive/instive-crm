@@ -90,6 +90,8 @@ export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today
  const unscheduledAll=contacts.filter(c=>c.status==='New'&&c.next_date===null);
  const unscheduledWithProfile=unscheduledAll.filter(c=>linkedinProfile(c)!==null);
  const blockedByCompany=unscheduledWithProfile.filter(c=>blocked.has(companyKey(c))).length;
+ const pendingHistoryReview=unscheduledWithProfile.filter(needsLinkedinMessageReview).length;
+ const pendingInvitations=unscheduledWithProfile.filter(c=>!verifiedLinkedinConnection(c)&&Boolean(exportedLinkedinInvitation(c))).length;
  const valid=(c:Contact)=>c.status==='New'&&!contacted.has(c.id)&&!needsLinkedinMessageReview(c)&&!exportedLinkedinInvitation(c)&&linkedinProfile(c)!==null&&!pulledForwardToday(c,today)&&Boolean(companyKey(c))&&!badCompany(c.company)&&
   !contacts.some(x=>x.id!==c.id&&companyKey(x)===companyKey(c)&&(x.status!=='New'||x.next_date!==null));
  const future=sortFollowUps(contacts.filter(c=>valid(c)&&c.next_date!==null&&c.next_date>today));
@@ -109,7 +111,7 @@ export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today
  const unscheduledUnique=unique(unscheduled);
  return {date,items:[...scheduledUnique,...unscheduledUnique],scheduledCount:scheduledUnique.length,unscheduledCount:unscheduledUnique.length,
   pool:{unscheduled:unscheduledAll.length,withProfile:unscheduledWithProfile.length,
-   withoutProfile:unscheduledAll.length-unscheduledWithProfile.length,blockedByCompany}};
+   withoutProfile:unscheduledAll.length-unscheduledWithProfile.length,blockedByCompany,pendingHistoryReview,pendingInvitations}};
 }
 export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKey()){
  const due=contacts.filter(c=>!inactive(c)&&c.status!=='Nurture'&&c.next_date&&c.next_date<=today);
