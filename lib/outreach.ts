@@ -116,7 +116,7 @@ export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today
  const scheduled=date?future.filter(c=>c.next_date===date):[];
  const unscheduled=sortFollowUps(contacts.filter(c=>valid(c)&&c.next_date===null&&
   c.priority!=='Low'&&c.name.trim()&&c.title.trim()&&c.notes.trim()&&
-  !blocked.has(companyKey(c))));
+  !blocked.has(companyKey(c)))).sort((a,b)=>Number(draftFor(b,activities).ready)-Number(draftFor(a,activities).ready));
  const companies=new Set<string>();
  const profiles=new Set<string>();
  const unique=(rows:Contact[])=>rows.filter(c=>{
@@ -126,7 +126,8 @@ export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today
  });
  const scheduledUnique=unique(scheduled);
  const unscheduledUnique=unique(unscheduled);
- return {date,items:[...scheduledUnique,...unscheduledUnique],scheduledCount:scheduledUnique.length,unscheduledCount:unscheduledUnique.length,
+ const readyBuffer=unscheduledUnique.filter(c=>draftFor(c,activities).ready).length;
+ return {date,items:[...scheduledUnique,...unscheduledUnique],scheduledCount:scheduledUnique.length,unscheduledCount:unscheduledUnique.length,readyBuffer,
   pool:{unscheduled:unscheduledAll.length,withProfile:unscheduledWithProfile.length,
    withoutProfile:unscheduledAll.length-unscheduledWithProfile.length,blockedByCompany,pendingHistoryReview,pendingInvitations}};
 }
