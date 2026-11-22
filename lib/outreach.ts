@@ -131,6 +131,11 @@ export function nextOutboundBatch(contacts:Contact[],activities:Activity[],today
   pool:{unscheduled:unscheduledAll.length,withProfile:unscheduledWithProfile.length,
    withoutProfile:unscheduledAll.length-unscheduledWithProfile.length,blockedByCompany,pendingHistoryReview,pendingInvitations}};
 }
+/** Assign extra outbounds only when a current, stage-matched, conversation-safe draft exists. */
+export function readyOutboundCandidates(contacts:Contact[],activities:Activity[],today=dateKey()){
+ return nextOutboundBatch(contacts,activities,today).items.filter(c=>draftFor(c,activities).ready);
+}
+
 export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKey()){
  const due=contacts.filter(c=>!inactive(c)&&c.status!=='Nurture'&&c.next_date&&c.next_date<=today);
  const follow=sortFollowUps(due.filter(c=>c.status!=='New'&&c.status!=='Meeting booked'));

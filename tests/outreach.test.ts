@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,actualLinkedinActionDay,defaultManualMessageKind,canRecordPastRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,actualLinkedinActionDay,defaultManualMessageKind,canRecordPastRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,nextOutboundBatch,readyOutboundCandidates,pullForwardNotes} from '../lib/outreach.ts';
 const c=(name:string,status='New',next_date:string|null='2026-11-16'):Contact=>({...blank,id:name,workspace_id:'w',name,status,next_date,created_at:'',priority:'High',linkedin:'https://www.linkedin.com/in/'+encodeURIComponent(name)});
 const a=(contact_id:string,kind:string,created_at='2026-11-16T09:00:00'):Activity=>({id:contact_id+kind,workspace_id:'w',contact_id,kind,channel:'LinkedIn',notes:'',created_at});
 test('never fabricate generic opener from a campaign alone',()=>{const x={...c('Alex'),company:'Freight Co',notes:'Recommended Campaign: Campaign 2 — Carrier Email → TMS Assignment'};assert.equal(draftFor(x,[]).text,'');assert.equal(draftFor(x,[]).ready,false);assert.equal(connectionNote(x),'')});
@@ -146,4 +146,13 @@ test('additional assignments prefer existing source-backed personalized drafts',
  const empty={...c('Empty','New',null),company:'Empty Logistics',title:'CEO',notes:'Research seed'};
  const plan=nextOutboundBatch([empty,ready],[],'2026-11-22');
  assert.equal(plan.items[0].id,'Ready');assert.equal(plan.readyBuffer,1);
+});
+
+test('extra assignment exposes only prospects with ready source-backed drafts',()=>{
+ const ready={...c('Ready','New',null),company:'Ready 3PL',title:'Operations Director',priority:'High',notes:'Personalized checked: 2026-11-22\nPersonalized basis: none\nPersonalized status: New\nPersonalized insight: The company offers cross-dock and parcel delivery\nPersonalized source: https://example.org/company\nPersonalized draft: Hey Ready, I saw your cross-dock network. How do you handle handoffs between dispatch and the warehouse?'};
+ const notReady={...c('Not ready','New','2026-11-25'),company:'Other Freight',title:'CEO',priority:'High',notes:'Research missing'};
+ const done={...c('Done','New',null),company:'Messaged Freight',title:'CEO',notes:ready.notes};
+ const items=readyOutboundCandidates([notReady,ready,done],[a('Done','First outreach sent')],'2026-11-22');
+ assert.deepEqual(items.map(c=>c.name),['Ready']);
+ assert.equal(nextOutboundBatch([notReady,ready],[],'2026-11-22').items.length,2);
 });
