@@ -140,3 +140,10 @@ test('manual backfills count on their actual sent day rather than date entered i
  const todayEntry={...historical,notes:'Actual LinkedIn send date: 2026-11-22\nRecorded manually in CRM on 2026-11-22'};
  assert.equal(dailyQueue([contact],[todayEntry],'2026-11-22').newToday,1);
 });
+
+test('additional assignments prefer existing source-backed personalized drafts',()=>{
+ const ready={...c('Ready','New',null),company:'Ready Logistics',title:'Director',notes:'Personalized checked: 2026-11-22\nPersonalized basis: none\nPersonalized status: New\nPersonalized source: https://example.org/company\nPersonalized insight: Freight forwarding\nPersonalized draft: Hey Ready, I saw your public operations process. How do you handle exceptions?'};
+ const empty={...c('Empty','New',null),company:'Empty Logistics',title:'CEO',notes:'Research seed'};
+ const plan=nextOutboundBatch([empty,ready],[],'2026-11-22');
+ assert.equal(plan.items[0].id,'Ready');assert.equal(plan.readyBuffer,1);
+});
