@@ -76,7 +76,7 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
   return noDraft('Needs research. Verify profile and chat.',topic);
  }
  if(latest?.kind==='Connection request sent'){
-  if(tailored.valid)return {text:tailored.draft,kind:'review',guidance:'Connection unconfirmed. Check acceptance before DM.',topic,ready:true};
+  if(tailored.valid)return {text:tailored.draft,kind:'review',guidance:'CONNECTION NOT CONFIRMED. Check acceptance before DM.',topic,ready:true};
   return noDraft('Check acceptance. Prepare a personal DM.',topic);
  }
  if(tailored.valid)return {text:tailored.draft,kind:'follow',guidance:'Check live thread before sending.',topic,ready:true};
