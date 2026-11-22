@@ -29,6 +29,8 @@ export function personalizedContext(c:Contact,history:Activity[]){
  const valid=Boolean(draft&&basis===last&&stage===c.status&&!alreadySent&&(!source||researchSource(source)));
  return {draft,connection,insight,source,checked,basis,valid};
 }
+/** Allow a request even without a DM draft, but never if outreach or a reply was logged. */
+export function canSendConnectionRequest(c:Contact,history:Activity[]){return c.status==='New'&&!inactive(c)&&!history.some(a=>outbound.includes(a.kind)||replies.includes(a.kind));}
 export function connectionNote(c:Contact){return c.status==='New'&&noteField(c.notes,'Personalized basis')==='none'&&noteField(c.notes,'Personalized status')==='New'?noteField(c.notes,'Personalized connection'):''}
 export type Draft={text:string;kind:'initial'|'follow'|'review';guidance:string;topic:string;ready:boolean};
 const noDraft=(guidance:string,topic:string):Draft=>({text:'',kind:'review',guidance,topic,ready:false});

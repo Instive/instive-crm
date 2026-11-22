@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,nextOutboundBatch,pullForwardNotes} from '../lib/outreach.ts';
 const c=(name:string,status='New',next_date:string|null='2026-11-16'):Contact=>({...blank,id:name,workspace_id:'w',name,status,next_date,created_at:'',priority:'High',linkedin:'https://www.linkedin.com/in/'+encodeURIComponent(name)});
 const a=(contact_id:string,kind:string,created_at='2026-11-16T09:00:00'):Activity=>({id:contact_id+kind,workspace_id:'w',contact_id,kind,channel:'LinkedIn',notes:'',created_at});
 test('never fabricate generic opener from a campaign alone',()=>{const x={...c('Alex'),company:'Freight Co',notes:'Recommended Campaign: Campaign 2 — Carrier Email → TMS Assignment'};assert.equal(draftFor(x,[]).text,'');assert.equal(draftFor(x,[]).ready,false);assert.equal(connectionNote(x),'')});
@@ -43,4 +43,13 @@ test('pending connection displays tailored DM only with acceptance warning',()=>
  const d=draftFor(x,[activity]);
  assert.equal(d.kind,'review');assert.match(d.guidance,/CONNECTION NOT CONFIRMED/);
  assert.match(d.text,/freight audit/);
+});
+
+test('connection option appears for New prospects even when no researched DM exists',()=>{
+ const x=c('Sam');assert.equal(draftFor(x,[]).text,'');assert.equal(canSendConnectionRequest(x,[]),true);
+ assert.equal(canSendConnectionRequest({...x,notes:'Personalized status: New\\nPersonalized basis: none'},[]),true);
+});
+test('connection option hides after sent request, DM, reply, or closed status',()=>{
+ const x=c('Sam');for(const kind of ['Connection request sent','First outreach sent','Follow-up sent','Reply received'])assert.equal(canSendConnectionRequest(x,[a('Sam',kind)]),false);
+ for(const status of ['Contacted','Nurture','Do not contact','Not interested','Converted'])assert.equal(canSendConnectionRequest({...x,status},[]),false);
 });
