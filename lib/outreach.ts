@@ -86,6 +86,16 @@ export function draftFor(c:Contact,history:Activity[]):Draft{
  if(saved)return {text:saved,kind:'follow',guidance:'Review live thread and adjust draft.',topic,ready:true};
  return noDraft('No verified draft. Research this prospect.',topic);
 }
+export function missingDraftState(c:Contact,history:Activity[]){
+ const h=contactHistory(c,history),last=h.find(a=>outbound.includes(a.kind)||replies.includes(a.kind));
+ if(inactive(c)||c.status==='Nurture'||unansweredFollowUps(h)>=2)return {title:'Follow-up paused',detail:'Wait for a reply or new reason to reconnect.'};
+ if(needsLinkedinMessageReview(c))return {title:'Review previous DMs',detail:'Check LinkedIn before drafting or resending.'};
+ if(last?.kind==='Connection request sent')return verifiedLinkedinConnection(c)?
+  {title:'Connection accepted',detail:'Check the live chat before sending a first DM.'}:
+  {title:'Connection request pending',detail:'Check acceptance in LinkedIn. Do not resend.'};
+ if(c.status==='New'&&exportedLinkedinInvitation(c))return {title:'Invitation pending',detail:'Confirm acceptance before a first DM.'};
+ return {title:'Personalization required',detail:'The weekday planner prepares drafts. Check LinkedIn before sending.'};
+}
 export function nextAfterSend(c:Contact,history:Activity[],kind:string,start=new Date()){
  if(kind==='Connection request sent')return {status:c.status==='New'?'Contacted':c.status,date:businessDays(5,start),action:'LinkedIn: check connection acceptance; do not send a duplicate request'};
  if(kind==='First outreach sent')return {status:c.status==='New'?'Contacted':c.status,date:businessDays(3,start),action:'LinkedIn: check for reply; first follow-up if appropriate'};

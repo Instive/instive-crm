@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,actualLinkedinActionDay,defaultManualMessageKind,canRecordPastRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,nextOutboundBatch,readyOutboundCandidates,pullForwardNotes} from '../lib/outreach.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {blank,type Contact,type Activity} from '../lib/model.ts';import {draftFor,nextAfterSend,dailyQueue,linkedinProfile,researchContext,researchSource,personalizedContext,connectionNote,canSendConnectionRequest,actualLinkedinActionDay,defaultManualMessageKind,canRecordPastRequest,verifiedLinkedinConnection,exportedLinkedinInvitation,needsLinkedinMessageReview,missingDraftState,nextOutboundBatch,readyOutboundCandidates,pullForwardNotes} from '../lib/outreach.ts';
 const c=(name:string,status='New',next_date:string|null='2026-11-16'):Contact=>({...blank,id:name,workspace_id:'w',name,status,next_date,created_at:'',priority:'High',linkedin:'https://www.linkedin.com/in/'+encodeURIComponent(name)});
 const a=(contact_id:string,kind:string,created_at='2026-11-16T09:00:00'):Activity=>({id:contact_id+kind,workspace_id:'w',contact_id,kind,channel:'LinkedIn',notes:'',created_at});
 test('never fabricate generic opener from a campaign alone',()=>{const x={...c('Alex'),company:'Freight Co',notes:'Recommended Campaign: Campaign 2 — Carrier Email → TMS Assignment'};assert.equal(draftFor(x,[]).text,'');assert.equal(draftFor(x,[]).ready,false);assert.equal(connectionNote(x),'')});
@@ -155,4 +155,13 @@ test('extra assignment exposes only prospects with ready source-backed drafts',(
  const items=readyOutboundCandidates([notReady,ready,done],[a('Done','First outreach sent')],'2026-11-22');
  assert.deepEqual(items.map(c=>c.name),['Ready']);
  assert.equal(nextOutboundBatch([notReady,ready],[],'2026-11-22').items.length,2);
+});
+
+test('missing-draft cards distinguish pending connections from research gaps',()=>{
+ const contact={...c('Dana','Contacted','2026-11-26'),company:'Freight Corp'};
+ const pending=a('Dana','Connection request sent');
+ assert.equal(missingDraftState(contact,[pending]).title,'Connection request pending');
+ assert.equal(missingDraftState({...contact,notes:'LinkedIn connection verified: 2026-11-20'},[pending]).title,'Connection accepted');
+ assert.equal(missingDraftState({...contact,status:'New'},[]).title,'Personalization required');
+ assert.equal(missingDraftState({...contact,notes:'LinkedIn opener history: NOT VERIFIED'},[]).title,'Review previous DMs');
 });
