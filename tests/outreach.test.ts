@@ -165,3 +165,21 @@ test('missing-draft cards distinguish pending connections from research gaps',()
  assert.equal(missingDraftState({...contact,status:'New'},[]).title,'Personalization required');
  assert.equal(missingDraftState({...contact,notes:'LinkedIn opener history: NOT VERIFIED'},[]).title,'Review previous DMs');
 });
+
+test('ready researched conversations appear before unprepared and pending connection checks',()=>{
+ const date='2026-11-26';
+ const pending={...c('Pending','Contacted','2026-11-24'),company:'Pending Freight'};
+ const noDraft={...c('No draft','Contacted','2026-11-24'),company:'No Draft Logistics'};
+ const ready={...c('Ready','Contacted','2026-11-26'),company:'Ready Logistics',notes:'Personalized checked: 2026-11-26\nPersonalized basis: ReadyFirst outreach sent\nPersonalized status: Contacted\nPersonalized insight: A public warehouse and transport offering\nPersonalized source: https://example.org/about\nPersonalized draft: Hey Ready, I noticed your warehousing network. Would a focused exception-triage workflow be useful to your operations team?'};
+ const history=[a('Pending','Connection request sent'),a('No draft','First outreach sent'),a('Ready','First outreach sent')];
+ const plan=dailyQueue([pending,noDraft,ready],history,date);
+ assert.deepEqual(plan.follow.map(x=>x.name),['Ready','No draft']);
+ assert.equal(plan.pendingTotal,1);
+ assert.deepEqual(plan.pending.map(x=>x.name),['Pending']);
+});
+test('confirmed LinkedIn connection with a recorded request can receive a researched DM',()=>{
+ const linked={...c('Accepted','Contacted','2026-11-26'),company:'Freight Logistics',notes:'LinkedIn connection verified: 2026-11-20\nPersonalized checked: 2026-11-26\nPersonalized basis: AcceptedConnection request sent\nPersonalized status: Contacted\nPersonalized insight: Company specializes in road freight\nPersonalized source: https://example.org\nPersonalized draft: Hey Accepted, I noticed your road-freight focus. Which carrier exception still needs manual review?'};
+ const plan=dailyQueue([linked],[a('Accepted','Connection request sent')],'2026-11-26');
+ assert.equal(plan.pendingTotal,0);
+ assert.equal(plan.follow[0].name,'Accepted');
+});

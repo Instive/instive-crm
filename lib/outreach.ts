@@ -148,8 +148,18 @@ export function readyOutboundCandidates(contacts:Contact[],activities:Activity[]
 
 export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKey()){
  const due=contacts.filter(c=>!inactive(c)&&c.status!=='Nurture'&&c.next_date&&c.next_date<=today);
- const follow=sortFollowUps(due.filter(c=>c.status!=='New'&&c.status!=='Meeting booked'));
- const first=sortFollowUps(due.filter(c=>c.status==='New'&&linkedinProfile(c)!==null));
+ const dueFollow=sortFollowUps(due.filter(c=>c.status!=='New'&&c.status!=='Meeting booked'));
+ // A pending invitation is a check-in, not a warm DM. Keep it visible, but never
+ // allow it to consume a message-ready follow-up slot.
+ const pending=dueFollow.filter(c=>{
+  const h=contactHistory(c,activities);
+  return h.find(a=>outbound.includes(a.kind)||replies.includes(a.kind))?.kind==='Connection request sent'&&!verifiedLinkedinConnection(c);
+ });
+ const pendingIds=new Set(pending.map(c=>c.id));
+ const followCandidates=dueFollow.filter(c=>!pendingIds.has(c.id));
+ const follow=[...followCandidates.filter(c=>draftFor(c,activities).ready),...followCandidates.filter(c=>!draftFor(c,activities).ready)];
+ const firstDue=sortFollowUps(due.filter(c=>c.status==='New'&&linkedinProfile(c)!==null));
+ const first=[...firstDue.filter(c=>draftFor(c,activities).ready),...firstDue.filter(c=>!draftFor(c,activities).ready)];
  const pulled=first.filter(c=>pulledForwardToday(c,today));
  const normal=first.filter(c=>!pulledForwardToday(c,today));
  const extraNew=contacts.filter(c=>pulledForwardToday(c,today)).length;
@@ -160,5 +170,5 @@ export function dailyQueue(contacts:Contact[],activities:Activity[],today=dateKe
  const remaining=Math.max(0,newLimit-newToday);
  // Retain the ordinary queue order; reserve space for pulled prospects even with a large overdue backlog.
  const normalSlots=Math.max(0,remaining-pulled.length);
- return {follow:follow.slice(0,Math.max(0,FOLLOW_LIMIT-followToday)),first:[...normal.slice(0,normalSlots),...pulled].slice(0,remaining),followTotal:follow.length,firstTotal:first.length,newToday,followToday,newLimit,extraNew};
+ return {follow:follow.slice(0,Math.max(0,FOLLOW_LIMIT-followToday)),pending:pending.slice(0,8),pendingTotal:pending.length,first:[...normal.slice(0,normalSlots),...pulled].slice(0,remaining),followTotal:follow.length,firstTotal:first.length,newToday,followToday,newLimit,extraNew};
 }
